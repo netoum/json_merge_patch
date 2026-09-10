@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: test
+    strategy:
+      matrix:
+        include:
+          - elixir: "1.17"
+            otp: "27"
+            dialyzer: false
+          - elixir: "1.19.5"
+            otp: "28.3"
+            dialyzer: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix compile --warnings-as-errors
+      - run: mix credo --strict
+      - run: mix test
+      - uses: actions/cache@v4
+        if: ${{ matrix.dialyzer }}
+        with:
+          path: priv/plts
+          key: dialyzer-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+          restore-keys: dialyzer-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
+      - name: Dialyzer
+        if: ${{ matrix.dialyzer }}
+        env:
+          MIX_ENV: dev
+        run: |
+          mix deps.get
+          mix dialyzer
