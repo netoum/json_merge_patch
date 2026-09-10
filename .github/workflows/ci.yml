@@ -2,12 +2,61 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    env:
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3"
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: deps-${{ runner.os }}-28.3-1.19.5-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            deps-${{ runner.os }}-28.3-1.19.5
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: mix format
+        run: mix format --check-formatted
+
+      - name: mix compile
+        run: mix compile --warnings-as-errors
+
+      - name: mix credo
+        run: mix credo --strict
+
+      - name: mix docs
+        env:
+          MIX_ENV: dev
+        run: mix deps.get && mix docs
+
+      - name: mix hex.build
+        run: mix hex.build
+
+  unit-tests:
+    name: Unit tests (OTP ${{ matrix.otp }} | Elixir ${{ matrix.elixir }})
+    runs-on: ubuntu-24.04
     env:
       MIX_ENV: test
     strategy:
@@ -15,43 +64,64 @@ jobs:
         include:
           - elixir: "1.17"
             otp: "27"
-            dialyzer: false
-            hex_build: false
           - elixir: "1.19.5"
             otp: "28.3"
-            dialyzer: true
-            hex_build: true
     steps:
       - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
-      - uses: actions/cache@v4
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
         with:
           path: |
             deps
             _build
-          key: mix-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
-          restore-keys: mix-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
-      - run: mix deps.get
-      - run: mix format --check-formatted
-      - run: mix compile --warnings-as-errors
-      - run: mix credo --strict
-      - run: mix test
-      - name: Hex build
-        if: ${{ matrix.hex_build }}
-        run: mix hex.build
-      - uses: actions/cache@v4
-        if: ${{ matrix.dialyzer }}
+          key: deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            deps-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Run tests
+        run: mix test
+
+  dialyzer:
+    name: Dialyzer
+    runs-on: ubuntu-24.04
+    env:
+      MIX_ENV: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3"
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: dialyzer-deps-${{ runner.os }}-28.3-1.19.5-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            dialyzer-deps-${{ runner.os }}-28.3-1.19.5
+
+      - name: Restore PLT cache
+        uses: actions/cache@v4
         with:
           path: priv/plts
-          key: dialyzer-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
-          restore-keys: dialyzer-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
+          key: plt-${{ runner.os }}-28.3-1.19.5-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            plt-${{ runner.os }}-28.3-1.19.5
+
       - name: Dialyzer
-        if: ${{ matrix.dialyzer }}
-        env:
-          MIX_ENV: dev
-        run: |
-          mix deps.get
-          mix dialyzer
+        run: mix deps.get && mix dialyzer
