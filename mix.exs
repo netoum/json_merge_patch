@@ -16,7 +16,8 @@ defmodule JsonMergePatch.MixProject do
       description: description(),
       package: package(),
       docs: docs(),
-      dialyzer: dialyzer()
+      dialyzer: dialyzer(),
+      test_coverage: [summary: [threshold: 100]]
     ]
   end
 
@@ -59,11 +60,12 @@ defmodule JsonMergePatch.MixProject do
     [
       main: "readme",
       source_url: @source_url,
-      source_ref: "v#{@version}",
+      source_ref: "main",
       extras: [
         "README.md",
         "CHANGELOG.md": [title: "Changelog"]
       ],
+      assets: %{"assets" => "assets"},
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
     ]
   end

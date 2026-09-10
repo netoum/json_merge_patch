@@ -48,6 +48,7 @@ defmodule JsonMergePatchTest do
       assert JsonMergePatch.apply_patch(%{"a" => 1}, false) == {:ok, false}
       assert JsonMergePatch.apply_patch(%{"a" => 1}, 42) == {:ok, 42}
       assert JsonMergePatch.apply_patch(%{"a" => 1}, 1.5) == {:ok, 1.5}
+      assert JsonMergePatch.apply_patch(%{"a" => 1}, "foo") == {:ok, "foo"}
     end
   end
 
@@ -140,11 +141,20 @@ defmodule JsonMergePatchTest do
 
     test "raises on an invalid patch" do
       error =
-        assert_raise JsonMergePatch.Error, "invalid JSON Merge Patch patch", fn ->
+        assert_raise JsonMergePatch.Error, "invalid merge patch", fn ->
           JsonMergePatch.apply_patch!(%{}, %{a: 1})
         end
 
       assert error.reason == :invalid_patch
+    end
+
+    test "raise without a reason does not crash in message/1" do
+      error =
+        assert_raise JsonMergePatch.Error, "JSON Merge Patch error", fn ->
+          raise JsonMergePatch.Error
+        end
+
+      assert error.reason == nil
     end
   end
 
@@ -192,10 +202,37 @@ defmodule JsonMergePatchTest do
                JsonMergePatch.apply_patch(%{}, {1, 2}, max_depth: 8)
     end
 
-    test "walks lists and scalars within the limit" do
+    test "walks lists and nil within the limit" do
       assert JsonMergePatch.apply_patch(%{"a" => 1}, nil, max_depth: 1) == {:ok, nil}
       assert JsonMergePatch.apply_patch([1], [], max_depth: 1) == {:ok, []}
       assert JsonMergePatch.apply_patch(%{"a" => 1}, [1, 2], max_depth: 2) == {:ok, [1, 2]}
+    end
+
+    test "limits patch nesting only, not the target" do
+      target = %{"a" => %{"b" => %{"c" => 1}}}
+
+      assert JsonMergePatch.apply_patch(target, %{"a" => 2}, max_depth: 1) ==
+               {:ok, %{"a" => 2}}
+    end
+
+    test "raises ArgumentError for an invalid max_depth" do
+      message = ":max_depth must be a positive integer or :infinity"
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: 0)
+      end
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: -1)
+      end
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: "foo")
+      end
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: nil)
+      end
     end
   end
 end

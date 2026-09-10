@@ -25,3 +25,9 @@ json_merge_patch-*.tar
 # Dialyzer PLT files.
 /priv/plts/
 
+# Language server
+.elixir_ls/
+
+# Mix fetch metadata
+.fetch
+
