@@ -16,20 +16,32 @@ jobs:
           - elixir: "1.17"
             otp: "27"
             dialyzer: false
+            hex_build: false
           - elixir: "1.19.5"
             otp: "28.3"
             dialyzer: true
+            hex_build: true
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+          restore-keys: mix-${{ runner.os }}-${{ matrix.otp }}-${{ matrix.elixir }}-
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix credo --strict
       - run: mix test
+      - name: Hex build
+        if: ${{ matrix.hex_build }}
+        run: mix hex.build
       - uses: actions/cache@v4
         if: ${{ matrix.dialyzer }}
         with:

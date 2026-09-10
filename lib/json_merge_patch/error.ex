@@ -23,10 +23,14 @@ defmodule JsonMergePatch.Error do
   end
 
   def message(%__MODULE__{reason: :invalid_patch}) do
-    "invalid JSON Merge Patch patch"
+    "invalid merge patch"
   end
 
   def message(%__MODULE__{reason: :max_depth_exceeded}) do
     "JSON Merge Patch exceeds max depth"
+  end
+
+  def message(%__MODULE__{}) do
+    "JSON Merge Patch error"
   end
 end

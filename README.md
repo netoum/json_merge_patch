@@ -48,6 +48,11 @@ Authorize the change in the caller, then apply ([RFC 7396](https://datatracker.i
 
 [![Netoum](assets/netoum.png)](https://netoum.com)
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). This project follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
 MIT © [Netoum](https://netoum.com). See `LICENSE`.
