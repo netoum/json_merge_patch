@@ -214,5 +214,25 @@ defmodule JsonMergePatchTest do
       assert JsonMergePatch.apply_patch(target, %{"a" => 2}, max_depth: 1) ==
                {:ok, %{"a" => 2}}
     end
+
+    test "raises ArgumentError for an invalid max_depth" do
+      message = ":max_depth must be a positive integer or :infinity"
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: 0)
+      end
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: -1)
+      end
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: "foo")
+      end
+
+      assert_raise ArgumentError, ~r/#{Regex.escape(message)}/, fn ->
+        JsonMergePatch.apply_patch(%{}, %{}, max_depth: nil)
+      end
+    end
   end
 end

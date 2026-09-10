@@ -35,9 +35,6 @@ defmodule JsonMergePatch do
           | [json()]
           | %{optional(String.t()) => json()}
 
-  @typedoc "Reason stored on `JsonMergePatch.Error`."
-  @type error_reason :: Error.reason()
-
   @typedoc "Option for `apply_patch/3`."
   @type opt :: {:max_depth, pos_integer() | :infinity}
 
@@ -55,7 +52,8 @@ defmodule JsonMergePatch do
   ## Options
 
     * `:max_depth` - maximum nesting in the patch (objects and arrays). The
-      top-level patch value is depth 1. Defaults to `:infinity`.
+      top-level patch value is depth 1. Defaults to `:infinity`. Callers
+      applying patches from untrusted sources should set `:max_depth`.
 
   ## Examples
 
@@ -71,10 +69,10 @@ defmodule JsonMergePatch do
   @spec apply_patch(term(), term()) :: {:ok, json()} | {:error, Error.t()}
   @spec apply_patch(term(), term(), opts()) :: {:ok, json()} | {:error, Error.t()}
   def apply_patch(target, patch, opts \\ []) do
-    max_depth = Keyword.get(opts, :max_depth, :infinity)
+    max_depth = opts |> Keyword.get(:max_depth, :infinity) |> validate_max_depth()
 
-    with :ok <- validate(target, :invalid_target),
-         :ok <- validate_patch(patch, max_depth, 1) do
+    with :ok <- walk(target, :invalid_target, :infinity, 1),
+         :ok <- walk(patch, :invalid_patch, max_depth, 1) do
       {:ok, merge(target, patch)}
     end
   end
@@ -93,106 +91,67 @@ defmodule JsonMergePatch do
   def apply_patch!(target, patch, opts \\ []) do
     case apply_patch(target, patch, opts) do
       {:ok, result} -> result
-      {:error, %Error{reason: reason}} -> raise Error, reason: reason
+      {:error, %Error{} = error} -> raise error
     end
   end
 
-  defp validate(term, reason) do
-    if json_term?(term) do
-      :ok
-    else
-      {:error, %Error{reason: reason}}
+  defp error(reason), do: {:error, %Error{reason: reason}}
+
+  defp validate_max_depth(:infinity), do: :infinity
+  defp validate_max_depth(depth) when is_integer(depth) and depth > 0, do: depth
+
+  defp validate_max_depth(other) do
+    raise ArgumentError,
+          ":max_depth must be a positive integer or :infinity, got: #{inspect(other)}"
+  end
+
+  defp walk(nil, _reason, _max_depth, _depth), do: :ok
+
+  defp walk(term, _reason, _max_depth, _depth)
+       when is_boolean(term) or is_number(term) or is_binary(term) do
+    :ok
+  end
+
+  defp walk(term, _reason, max_depth, depth)
+       when is_integer(max_depth) and depth > max_depth and
+              (is_list(term) or (is_map(term) and not is_struct(term))) do
+    error(:max_depth_exceeded)
+  end
+
+  defp walk([], _reason, _max_depth, _depth), do: :ok
+
+  defp walk([head | tail], reason, max_depth, depth) when is_list(tail) do
+    with :ok <- walk(head, reason, max_depth, depth + 1) do
+      walk(tail, reason, max_depth, depth)
     end
   end
 
-  defp validate_patch(term, :infinity, _depth) do
-    validate(term, :invalid_patch)
-  end
+  defp walk(term, reason, _max_depth, _depth) when is_list(term), do: error(reason)
 
-  defp validate_patch(term, max_depth, depth) when is_integer(max_depth) do
-    cond do
-      json_scalar?(term) ->
-        :ok
-
-      json_container?(term) and depth > max_depth ->
-        {:error, %Error{reason: :max_depth_exceeded}}
-
-      is_map(term) and not is_struct(term) ->
-        validate_map_values(term, max_depth, depth)
-
-      is_list(term) ->
-        validate_list_elements(term, max_depth, depth)
-
-      true ->
-        {:error, %Error{reason: :invalid_patch}}
-    end
-  end
-
-  defp json_scalar?(nil), do: true
-  defp json_scalar?(term) when is_boolean(term) or is_number(term) or is_binary(term), do: true
-  defp json_scalar?(_term), do: false
-
-  defp json_container?(term) when is_list(term), do: true
-  defp json_container?(%{} = term) when not is_struct(term), do: true
-  defp json_container?(_term), do: false
-
-  defp validate_map_values(map, max_depth, depth) do
-    Enum.reduce_while(map, :ok, fn
+  defp walk(term, reason, max_depth, depth) when is_map(term) and not is_struct(term) do
+    Enum.reduce_while(term, :ok, fn
       {key, value}, :ok when is_binary(key) ->
-        case validate_patch(value, max_depth, depth + 1) do
+        case walk(value, reason, max_depth, depth + 1) do
           :ok -> {:cont, :ok}
           error -> {:halt, error}
         end
 
       _pair, _acc ->
-        {:halt, {:error, %Error{reason: :invalid_patch}}}
+        {:halt, error(reason)}
     end)
   end
 
-  defp validate_list_elements([], _max_depth, _depth), do: :ok
+  defp walk(_term, reason, _max_depth, _depth), do: error(reason)
 
-  defp validate_list_elements([head | tail], max_depth, depth) when is_list(tail) do
-    with :ok <- validate_patch(head, max_depth, depth + 1) do
-      validate_list_elements(tail, max_depth, depth)
-    end
-  end
-
-  defp validate_list_elements(_term, _max_depth, _depth) do
-    {:error, %Error{reason: :invalid_patch}}
-  end
-
-  defp merge(target, %{} = patch) when not is_struct(patch) do
-    base = if json_object?(target), do: target, else: %{}
-
-    Enum.reduce(patch, base, fn
+  defp merge(%{} = target, %{} = patch)
+       when not is_struct(target) and not is_struct(patch) do
+    Enum.reduce(patch, target, fn
       {key, nil}, acc -> Map.delete(acc, key)
       {key, value}, acc -> Map.put(acc, key, merge(Map.get(acc, key), value))
     end)
   end
 
+  defp merge(_target, %{} = patch) when not is_struct(patch), do: merge(%{}, patch)
+
   defp merge(_target, patch), do: patch
-
-  defp json_object?(%{} = term) when not is_struct(term), do: true
-  defp json_object?(_term), do: false
-
-  defp json_term?(nil), do: true
-
-  defp json_term?(term) when is_boolean(term) or is_number(term) or is_binary(term) do
-    true
-  end
-
-  defp json_term?([]), do: true
-
-  defp json_term?([head | tail]) when is_list(tail) do
-    json_term?(head) and json_term?(tail)
-  end
-
-  defp json_term?(term) when is_map(term) and not is_struct(term) do
-    Enum.all?(term, fn
-      {key, value} when is_binary(key) -> json_term?(value)
-      _ -> false
-    end)
-  end
-
-  defp json_term?(_term), do: false
 end

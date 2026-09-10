@@ -6,7 +6,7 @@ Before opening a pull request, run:
 
 ```shell
 mix format
-mix test
+mix test --cover
 mix credo --strict
 ```
 

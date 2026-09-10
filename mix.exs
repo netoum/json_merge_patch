@@ -16,7 +16,8 @@ defmodule JsonMergePatch.MixProject do
       description: description(),
       package: package(),
       docs: docs(),
-      dialyzer: dialyzer()
+      dialyzer: dialyzer(),
+      test_coverage: [summary: [threshold: 100]]
     ]
   end
 
