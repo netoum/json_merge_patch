@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.0 (unreleased)
+## v0.1.0 (2026-09-11)
 
 Initial release. RFC 7396 JSON Merge Patch on decoded JSON values.
 
