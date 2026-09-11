@@ -46,7 +46,7 @@ Authorize the change in the caller, then apply ([RFC 7396](https://datatracker.i
 
 ## Sponsor
 
-[![Netoum](assets/netoum.png)](https://netoum.com)
+[![Netoum](https://i.ibb.co/Zp0MC9VL/netoum-square-1.png)](https://netoum.com)
 
 ## Contributing
 

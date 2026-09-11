@@ -48,7 +48,7 @@ defmodule JsonMergePatch.MixProject do
     [
       licenses: ["MIT"],
       files:
-        ~w(lib mix.exs README.md CHANGELOG.md LICENSE .formatter.exs assets CONTRIBUTING.md CODE_OF_CONDUCT.md),
+        ~w(lib mix.exs README.md CHANGELOG.md LICENSE .formatter.exs CONTRIBUTING.md CODE_OF_CONDUCT.md),
       links: %{
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md",
@@ -68,7 +68,6 @@ defmodule JsonMergePatch.MixProject do
         "CONTRIBUTING.md": [title: "Contributing"],
         "CODE_OF_CONDUCT.md": [title: "Code of Conduct"]
       ],
-      assets: %{"assets" => "assets"},
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
     ]
   end
