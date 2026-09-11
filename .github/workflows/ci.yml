@@ -49,7 +49,7 @@ jobs:
       - name: mix docs
         env:
           MIX_ENV: dev
-        run: mix deps.get && mix docs
+        run: mix deps.get && mix docs --warnings-as-errors
 
       - name: mix hex.build
         run: mix hex.build
